@@ -1,2 +1,2 @@
-../Core/Src/HC05.c:16:6:InitializeBT	1
-../Core/Src/HC05.c:20:6:processInput	7
+../Core/Src/HC05.c:24:6:InitializeBT	1
+../Core/Src/HC05.c:28:6:processInput	7

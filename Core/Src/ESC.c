@@ -1,47 +1,137 @@
-/*
- * ESC.c
- *
- *  Created on: May 20, 2025
- *      Author: aaron
- */
+/**
+  ******************************************************************************
+  * @file    ESC.c
+  * @author  Aaron Lubinsky
+  * @brief   ESC driver
+  *
+  ******************************************************************************
+  ==============================================================================
+                        ##### How to use this driver #####
+  ==============================================================================
 
+
+
+  */
 
 #include "ESC.h"
 #include "stm32f4xx_hal.h"   // Needed for HAL types
 #include <stdint.h>
+#include <stdio.h>
 extern TIM_HandleTypeDef htim3;
-extern int effort_set;
+extern int effort_set, K_effort;
+// PID Constants
+extern int32_t Kp_roll, Ki_roll, Kd_roll;
+extern int32_t Kp_pitch, Ki_pitch, Kd_pitch;
+extern int32_t Kp_yaw, Ki_yaw, Kd_yaw;
+
+// PID States
+extern int32_t roll_set, roll_true, roll_error, roll_integral, roll_derivative, last_roll_error;
+extern int32_t pitch_set, pitch_true, pitch_error, pitch_integral, pitch_derivative, last_pitch_error;
+extern int32_t yaw_set, yaw_true, yaw_error, yaw_integral, yaw_derivative, last_yaw_error;
+extern int32_t roll_effort, pitch_effort, yaw_effort;       // output of control loop
+
+// PID Scaling
+#define PID_SCALE 1000
+
 int A, B, C, D = 0;
 int armCompare;
 
-void armESC(){
-	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+void armESC()
+{
+
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
-	armCompare =  effort_set + 1000;
-	    // Clamp between 3200 and 5000
-	    if (armCompare < 960) armCompare = 960;
-	    if (armCompare > 2000) armCompare = 20000;
+    // Step 1: Send 960 (approx. 1000us) to arm
+    uint16_t armCompare = 960;
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
+
+    for (int i = 0; i < 12; i++) {// Wait 3 seconds for ESCs to arm while blinking LED
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
+        HAL_Delay(125);
+    }
 
 
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
+    // Step 2: Now ready for throttle control
+    while(roll_set < 150000){
+     armCompare = 2000;
+     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
+     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
+     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
+     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
+
+     for (int i = 0; i < 12; i++) {// Wait 3 seconds for ESCs to arm while blinking LED
+            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
+            HAL_Delay(125);
+        }
+    }
+}
+
+
+
+void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
+	//  Roll
+	int roll_error = -roll_set + roll_true;
+	roll_integral += roll_error;
+	roll_derivative = roll_error - last_roll_error;
+	roll_effort = -(Kp_roll * roll_error + Ki_roll * roll_integral + Kd_roll * roll_derivative) / PID_SCALE;
+	last_roll_error = roll_error;
+
+	// Pitch
+	int pitch_error = -pitch_set + pitch_true;
+	pitch_integral += pitch_error;
+	pitch_derivative = pitch_error - last_pitch_error;
+	pitch_effort = -(Kp_pitch * pitch_error + Ki_pitch * pitch_integral + Kd_pitch * pitch_derivative) / PID_SCALE;
+	last_pitch_error = pitch_error;
+
+	//  Yaw
+	int yaw_error = -yaw_set + yaw_true;
+	yaw_integral += yaw_error;
+	yaw_derivative = yaw_error - last_yaw_error;
+	yaw_effort = -(Kp_yaw * yaw_error + Ki_yaw * yaw_integral + Kd_yaw * yaw_derivative) / PID_SCALE;
+	last_yaw_error = yaw_error;
+	//printf("Errors -> Roll, Pitch, Yaw,  %d,%d,%d \r\n", roll_error, pitch_error, yaw_error);
+
+
+	// Start with base throttle
+	A = B = C = D = effort_set * K_effort + 960;
+
+	// Pitch: affects A, B, C
+	if (pitch_effort > 0) {
+	    B += pitch_effort;
+	    C += pitch_effort;
+	}
+	else if (pitch_effort < 0) {
+	    A -= pitch_effort;  // pitch_effort is negative
+	    D -= pitch_effort;
 	}
 
+	// Roll: affects B, C
+	if (roll_effort > 0) {
+	    C += roll_effort;
+	    D += roll_effort;
+	}
+	else if (roll_effort < 0) {
+	    A -= roll_effort;
+	    B -= roll_effort;
+	}
 
+	// Yaw: affects A, C
+	if (yaw_effort > 0) {
+	    A += yaw_effort;
+	    C += yaw_effort;
+	}
+	else if (yaw_effort < 0) {
+	    C -= yaw_effort;
+	    D -= yaw_effort;
+	}
 
-void update_Motors(int32_t roll_effort, int32_t pitch_effort, int32_t yaw_effort, int32_t effort_set){ //Compare 3200 = 1ms (0%)    Compare 6400 = 2ms (100%)
-	A =  pitch_effort  -roll_effort  +yaw_effort*0  +effort_set*0.3 + 1200;
-	B = pitch_effort  +roll_effort  -yaw_effort*0  +effort_set*0.3 + 1200;
-	C =  -pitch_effort  +roll_effort  +yaw_effort*0  +effort_set*0.3 + 1200;
-	D =  -pitch_effort  -roll_effort  -yaw_effort*0  +effort_set*0.3 + 1200;
-
-
-    // Clamp between 3200 and 5000
+    // Clamp between 960 (0%) and 1500 (appx 50%)
     if (A < 960) A = 960;
     if (A > 1500) A = 1500;
 
@@ -54,9 +144,12 @@ void update_Motors(int32_t roll_effort, int32_t pitch_effort, int32_t yaw_effort
     if (D < 960) D = 960;
     if (D > 1500) D = 1500;
 
+    printf("%d,%d,%d,%d \r\n", A, B, C, D);
+
 
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, A);
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, B);
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, C);
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, D);
+
 }

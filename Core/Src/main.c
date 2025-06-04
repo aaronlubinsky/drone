@@ -50,8 +50,6 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
 
@@ -70,22 +68,22 @@ volatile int imu_request = 0;
 //State
 int32_t roll_set, pitch_set, yaw_set, effort_set;                // from user control
 int32_t roll_true, pitch_true, yaw_true;             // from IMU
-int32_t roll_effort, pitch_effort, yaw_effort;       // output of control loop
+int32_t roll_effort, pitch_effort, yaw_effort;
 
 // PID vars
-int32_t roll_error, pitch_error, yaw_error;
 int32_t roll_integral, pitch_integral, yaw_integral;
 int32_t roll_derivative, pitch_derivative, yaw_derivative;
 int32_t last_roll_error, last_pitch_error, last_yaw_error;        // error for sample n-1
 int32_t last_last_roll_error, last_last_pitch_error, last_last_yaw_error; // error for sample n-2
 
 // Gains
+int32_t K_effort;
 // Roll Axis
-int32_t Kp_roll  = 200;
+int32_t Kp_roll  = 10;
 int32_t Ki_roll = 0;
 int32_t Kd_roll = 0;
 // Pitch Axis
-int32_t Kp_pitch  = 200;
+int32_t Kp_pitch  = 10;
 int32_t Ki_pitch = 0;
 int32_t Kd_pitch = 0;
 
@@ -99,7 +97,7 @@ int32_t Kd_yaw = 0;
 uint8_t BT_RxBuf[BT_MSG_LEN];
 
 //IMU
-int arming = false;
+
 
 
 //
@@ -111,14 +109,13 @@ int arming = false;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
-static void PID(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -140,7 +137,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -156,7 +153,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_ADC1_Init();
   MX_I2C1_Init();
   MX_TIM3_Init();
   MX_USART1_UART_Init();
@@ -177,28 +173,19 @@ int main(void)
 		 state = 1;
 	 }else if (state == 1){
 		 HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1);
-		 if (roll_set > 150000){
-		 		 state =2;
-		 		  }
 		 if (roll_set<-150000){
-			 arming = true;
-		 }
-		 if (arming == true){
 			 armESC();
-
+			 state = 2;
+			 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
 		 }
-
-		 //imu_request = true;
 		 }else if(state == 2){
-		 HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1); //set up this function to run on next BT input
+
+			 imu_request = true;
 		  if (imu_request) {
 			  imu_request = false;
-		      //imu_request = false;
 		      BNO_Read(&roll_true, &pitch_true, &yaw_true);
-			  PID();
+			  update_Motors(roll_effort, pitch_effort, yaw_effort, effort_set); //includes PID loop in one functon
 
-			  update_Motors(roll_effort, pitch_effort, yaw_effort, effort_set);
-			  // Restart DMA to receive next message
 
 		  }
 	 }
@@ -216,7 +203,6 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
-
 
 /**
   * @brief System Clock Configuration
@@ -262,58 +248,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
-
-  /* USER CODE BEGIN ADC1_Init 0 */
-
-  /* USER CODE END ADC1_Init 0 */
-
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_1;
-  sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -550,11 +484,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13|GPIO_PIN_14, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, US_ECHO_Pin|US_TRIG_Pin|GPIO_PIN_14|GPIO_PIN_15
-                          |GPIO_PIN_9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, US_ECHO_Pin|US_TRIG_Pin|GPIO_PIN_14|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : PC13 PC14 */
   GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14;
@@ -563,27 +496,25 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PA0 PA1 PA11 PA12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_11|GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pin : PA4 */
   GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : US_ECHO_Pin US_TRIG_Pin PB14 PB15
-                           PB9 */
-  GPIO_InitStruct.Pin = US_ECHO_Pin|US_TRIG_Pin|GPIO_PIN_14|GPIO_PIN_15
-                          |GPIO_PIN_9;
+  /*Configure GPIO pins : US_ECHO_Pin US_TRIG_Pin PB14 PB9 */
+  GPIO_InitStruct.Pin = US_ECHO_Pin|US_TRIG_Pin|GPIO_PIN_14|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PA11 PA12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -591,33 +522,15 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-static void PID(void) {
-    //  Roll
-    roll_error = roll_set - roll_true;
-    roll_integral += roll_error;
-    roll_derivative = roll_error - last_roll_error;
-    roll_effort = (Kp_roll * roll_error + Ki_roll * roll_integral + Kd_roll * roll_derivative) / PID_SCALE;
-    last_roll_error = roll_error;
-
-    // Pitch
-    pitch_error = pitch_set - pitch_true;
-    pitch_integral += pitch_error;
-    pitch_derivative = pitch_error - last_pitch_error;
-    pitch_effort = (Kp_pitch * pitch_error + Ki_pitch * pitch_integral + Kd_pitch * pitch_derivative) / PID_SCALE;
-    last_pitch_error = pitch_error;
-
-    //  Yaw
-    yaw_error = yaw_set - yaw_true;
-    yaw_integral += yaw_error;
-    yaw_derivative = yaw_error - last_yaw_error;
-    yaw_effort = (Kp_yaw * yaw_error + Ki_yaw * yaw_integral + Kd_yaw * yaw_derivative) / PID_SCALE;
-    last_yaw_error = yaw_error;
-
-    printf("Errors -> Roll, Pitch, Yaw,  %d,%d,%d \r\n", roll_error, pitch_error, yaw_error);
-}
 
 
 
+/**
+  * @brief  This callback function is triggered when UART2 (HC05 Stream) fills BT_RxBuf (Direct to Memory).
+  *  It adds an end message statment, sends the buffer to the processInput function and sets the imu_request flag
+  *
+  * @retval None
+  */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)//should trigger when DMA reads complete message
 {    if (huart->Instance == USART2) {
         // Null-terminate just in case you're using sscanf or string functions
@@ -630,8 +543,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)//should trigger when DMA
         // Restart DMA to receive next message
         //HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN); //set up this function to run on next BT input
         imu_request = true; //set up IMU to run when interupt exits
+        HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1); //set up this function to run on next BT input
 }
-
+/**
+  * @brief  This function is used to send printf() statments to the ST-Link UART
+  * @retval None
+  */
 int __io_putchar(int ch) {
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;

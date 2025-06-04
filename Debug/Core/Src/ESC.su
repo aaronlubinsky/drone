@@ -1,2 +1,2 @@
-../Core/Src/ESC.c:17:6:armESC	8	static
-../Core/Src/ESC.c:37:6:update_Motors	32	static
+../Core/Src/ESC.c:39:6:armESC	24	static
+../Core/Src/ESC.c:77:6:update_Motors	32	static

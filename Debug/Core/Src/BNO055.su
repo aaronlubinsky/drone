@@ -1,2 +1,2 @@
-../Core/Src/BNO055.c:14:6:BNO_Init	40	static
-../Core/Src/BNO055.c:52:6:BNO_Read	64	static
+../Core/Src/BNO055.c:22:6:BNO_Init	40	static
+../Core/Src/BNO055.c:69:6:BNO_Read	64	static
