@@ -31,14 +31,14 @@ extern int32_t yaw_set, yaw_true, yaw_error, yaw_integral, yaw_derivative, last_
 extern int32_t roll_effort, pitch_effort, yaw_effort;       // output of control loop
 
 // PID Scaling
-#define PID_SCALE 1000
+#define PID_SCALE 100000
 
 int A, B, C, D = 0;
-int armCompare;
+extern int armCompare = 0;
 
 void armESC()
 {
-
+/*
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
@@ -51,26 +51,43 @@ void armESC()
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
 
-    for (int i = 0; i < 12; i++) {// Wait 3 seconds for ESCs to arm while blinking LED
+    while(roll_set < 150000){// Wait 3 seconds for ESCs to arm while blinking LED
         HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
         HAL_Delay(125);
     }
 
 
     // Step 2: Now ready for throttle control
-    while(roll_set < 150000){
+    while(roll_set > -150000){
      armCompare = 2000;
      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
-
-     for (int i = 0; i < 12; i++) {// Wait 3 seconds for ESCs to arm while blinking LED
             HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
             HAL_Delay(125);
         }
+ */
+	while(roll_set < 150000){
+	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+
+	    // Step 1: Send 960 (approx. 1000us) to arm
+	    armCompare = effort_set*1.5 +960;
+	    if (armCompare < 960) armCompare = 960;
+	    if (armCompare > 2000) armCompare = 2000;
+	    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
+	    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
+	    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
+	    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
+
+	    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
+	    HAL_Delay(125);
     }
 }
+
 
 
 
@@ -79,10 +96,21 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
 	int roll_error = -roll_set + roll_true;
 	roll_integral += roll_error;
 	roll_derivative = roll_error - last_roll_error;
+
+
+	///TESTING ONLY
 	roll_effort = -(Kp_roll * roll_error + Ki_roll * roll_integral + Kd_roll * roll_derivative) / PID_SCALE;
+	/////END TESTING
+
+
+	roll_effort = 0;
 	last_roll_error = roll_error;
 
 	// Pitch
+
+	///TESTING ONLY
+	pitch_set = 0;
+	/////END TESTING
 	int pitch_error = -pitch_set + pitch_true;
 	pitch_integral += pitch_error;
 	pitch_derivative = pitch_error - last_pitch_error;
@@ -103,32 +131,32 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
 
 	// Pitch: affects A, B, C
 	if (pitch_effort > 0) {
-	    B += pitch_effort;
-	    C += pitch_effort;
+	    A += pitch_effort;
+	    D += pitch_effort;
 	}
 	else if (pitch_effort < 0) {
-	    A -= pitch_effort;  // pitch_effort is negative
-	    D -= pitch_effort;
+	    B -= pitch_effort;  // pitch_effort is negative
+	    C -= pitch_effort;
 	}
 
 	// Roll: affects B, C
 	if (roll_effort > 0) {
-	    C += roll_effort;
 	    D += roll_effort;
+	    C += roll_effort;
 	}
 	else if (roll_effort < 0) {
-	    A -= roll_effort;
 	    B -= roll_effort;
+	    A -= roll_effort;
 	}
 
 	// Yaw: affects A, C
 	if (yaw_effort > 0) {
-	    A += yaw_effort;
-	    C += yaw_effort;
+	    B += yaw_effort;
+	    D += yaw_effort;
 	}
 	else if (yaw_effort < 0) {
-	    C -= yaw_effort;
 	    D -= yaw_effort;
+	    C -= yaw_effort;
 	}
 
     // Clamp between 960 (0%) and 1500 (appx 50%)
@@ -144,7 +172,9 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
     if (D < 960) D = 960;
     if (D > 1500) D = 1500;
 
-    printf("%d,%d,%d,%d \r\n", A, B, C, D);
+    //printf("%d,%d,%d,%d \r\n", A, B, C, D);
+
+
 
 
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, A);

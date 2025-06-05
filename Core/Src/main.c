@@ -37,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PID_SCALE 100000 //100,000 allow us to use ints, not floats for Kp of 1.1 --> 110_000
+#define PID_SCALE 1000000 //100,000 allow us to use ints, not floats for Kp of 1.1 --> 1,100_000
 #define true 1
 #define false 0
 #define BT_MSG_LEN 31
@@ -79,11 +79,11 @@ int32_t last_last_roll_error, last_last_pitch_error, last_last_yaw_error; // err
 // Gains
 int32_t K_effort;
 // Roll Axis
-int32_t Kp_roll  = 10;
+int32_t Kp_roll  = 100;
 int32_t Ki_roll = 0;
 int32_t Kd_roll = 0;
 // Pitch Axis
-int32_t Kp_pitch  = 10;
+int32_t Kp_pitch  = 100;
 int32_t Ki_pitch = 0;
 int32_t Kd_pitch = 0;
 
@@ -187,7 +187,7 @@ int main(void)
 			  update_Motors(roll_effort, pitch_effort, yaw_effort, effort_set); //includes PID loop in one functon
 
 
-		  }
+
 	 }
 
 
@@ -203,6 +203,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
+}
 
 /**
   * @brief System Clock Configuration
@@ -339,7 +340,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 50;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 19999;
+  htim3.Init.Period = 20660;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
