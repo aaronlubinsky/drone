@@ -37,10 +37,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PID_SCALE 1000000 //100,000 allow us to use ints, not floats for Kp of 1.1 --> 1,100_000
+#define PID_SCALE 100000 //100,000 allow us to use ints, not floats for Kp of 1.1 --> 1,100_000
 #define true 1
 #define false 0
-#define BT_MSG_LEN 31
+#define BT_MSG_LEN 37
 
 /* USER CODE END PD */
 
@@ -77,7 +77,7 @@ int32_t last_roll_error, last_pitch_error, last_yaw_error;        // error for s
 int32_t last_last_roll_error, last_last_pitch_error, last_last_yaw_error; // error for sample n-2
 
 // Gains
-int32_t K_effort;
+int32_t K_effort = 50000;
 // Roll Axis
 int32_t Kp_roll  = 100;
 int32_t Ki_roll = 0;
@@ -95,6 +95,7 @@ int32_t Kd_yaw = 0;
 
 //BT
 uint8_t BT_RxBuf[BT_MSG_LEN];
+int     dumpFlag = 0;
 
 //IMU
 
@@ -137,7 +138,8 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+
+	HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -178,17 +180,30 @@ int main(void)
 			 state = 2;
 			 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
 		 }
-		 }else if(state == 2){
+		 effort_set, roll_set, pitch_set = 0;
+		 pitch_integral = 0;
 
-			 imu_request = true;
-		  if (imu_request) {
-			  imu_request = false;
+	 }else if(state == 2){
+	//		 imu_request = true;
+	//	  if (imu_request) {
+    //		  imu_request = false;
 		      BNO_Read(&roll_true, &pitch_true, &yaw_true);
-			  update_Motors(roll_effort, pitch_effort, yaw_effort, effort_set); //includes PID loop in one functon
+			  update_Motors(roll_effort, pitch_effort, yaw_effort, effort_set);
+			  if (dumpFlag == 1){
+				  state = 3; }
+
+	 }else if(state == 3){
+		 	 dumpBlackbox();
+		 	 dumpFlag = 0;
+		 	HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1);
+		 	 if (roll_set<-150000){
+		 				 armESC();
+		 				 state = 2;
+		 				 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
 
 
+ }
 
-	 }
 
 
 
@@ -539,7 +554,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)//should trigger when DMA
 
         // Process entire message
 
-        processInput((char *)BT_RxBuf, &roll_set, &pitch_set, &yaw_set, &effort_set);
+        processInput((char *)BT_RxBuf, &roll_set, &pitch_set, &yaw_set, &effort_set, &dumpFlag);
         }
         // Restart DMA to receive next message
         //HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN); //set up this function to run on next BT input
@@ -551,7 +566,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)//should trigger when DMA
   * @retval None
   */
 int __io_putchar(int ch) {
-    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
 /* USER CODE END 4 */

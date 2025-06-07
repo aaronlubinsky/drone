@@ -20,11 +20,18 @@ void BNO_Read(int32_t *roll, int32_t *pitch, int32_t *yaw);
 #define BNO055_OPR_MODE_ADDR  0x3D
 #define BNO055_EULER_LSB    0x1A
 #define BNO055_CALIB_STAT 0x35
-
+#define MAX_SAMPLES 10000
+#define blackboxFreq 2
 
 //defines
 extern uint8_t ndof_buf;
-
+typedef struct {
+    int32_t pitch;
+    int32_t roll;
+} IMUSample;
+extern IMUSample blackbox[MAX_SAMPLES]; // flight data buffer
+extern uint16_t sample_index;
+extern int counter;
 
 
 

@@ -19,6 +19,11 @@ extern I2C_HandleTypeDef hi2c1;
 static uint8_t calibData;
 
 
+IMUSample blackbox[MAX_SAMPLES]; // flight data buffer
+uint16_t sample_index = 0;
+int counter =0;
+
+
 void BNO_Init(){
 	uint8_t ndof_mode = 0x0C;
 	uint8_t config_mode = 0x00;
@@ -28,40 +33,32 @@ void BNO_Init(){
 
 
 	while(successfulRead == false){ //WAIT to verify IMU connection
-	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
-	HAL_Delay(1000);
-	HAL_I2C_DeInit(&hi2c1);
+	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14); //reset BNO055
+	HAL_Delay(1000);						//wait on BNO
+	HAL_I2C_DeInit(&hi2c1);                 //reset I2C1
 	HAL_I2C_Init(&hi2c1);
-	if (hi2c1.State == HAL_I2C_STATE_READY) {
+	if (hi2c1.State == HAL_I2C_STATE_READY) { //once I2C is reset
 		HAL_I2C_Mem_Read(&hi2c1, BNO055_I2C_ADDR, 0x00, 1, &sampleData, 1, 100); // 0xaA0 should be returned if receiving from IMU
 	}
-	if (sampleData == 0xa0){
+	if (sampleData == 0xa0){ //verify that the data read is expected, not junk
 		successfulRead = true;
 	}
-
-
 	}
 	// Set to CONFIG mode
-    HAL_I2C_Mem_Write(&hi2c1, BNO055_I2C_ADDR, BNO055_OPR_MODE_ADDR,
-                      I2C_MEMADD_SIZE_8BIT, &config_mode, 1, 100);
+    HAL_I2C_Mem_Write(&hi2c1, BNO055_I2C_ADDR, BNO055_OPR_MODE_ADDR, I2C_MEMADD_SIZE_8BIT, &config_mode, 1, 100);
     HAL_Delay(25);
-
     //Set to NDOF mode
-    HAL_I2C_Mem_Write(&hi2c1, BNO055_I2C_ADDR, BNO055_OPR_MODE_ADDR,
-                      I2C_MEMADD_SIZE_8BIT, &ndof_mode, 1, 100);
+    HAL_I2C_Mem_Write(&hi2c1, BNO055_I2C_ADDR, BNO055_OPR_MODE_ADDR, I2C_MEMADD_SIZE_8BIT, &ndof_mode, 1, 100);
     HAL_Delay(25);
 
-
-	//WAIT until IMU is callibrated
-
-	while(calibrated == false){ //wait for imu to calibrate
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);   // Set PA0 High
+	while(calibrated == false){ //wait for IMU to calibrate
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);   // Set PA0 High (Red LED on)
 		HAL_I2C_Mem_Read(&hi2c1, BNO055_I2C_ADDR, BNO055_CALIB_STAT, 1, &calibData, 1, 100);
-		if (((calibData >> 6) & 0x03) == 0x03){
+		if (((calibData >> 6) & 0x03) == 0x03){ //if sys cal 2-bit is equal to 3
 			calibrated = true;
 
 	}
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);   // Set PA0 High
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);   // Set PA0 Low (red LED off)
 }
 }
 
@@ -81,5 +78,15 @@ void BNO_Read(int32_t *roll, int32_t *pitch, int32_t *yaw){
     *yaw   = ((int32_t)rawYaw16 * 1000) / 16;
     *roll  = ((int32_t)rawRoll16 * 1000) / 16;
     *pitch = ((int32_t)rawPitch16 * 1000) / 16;
+
+    if (counter++ == blackboxFreq) { //This will send data every 'blackboxFreq' to blackbox for data analysis
+        if (sample_index < MAX_SAMPLES) {
+            blackbox[sample_index].pitch = *pitch;
+            blackbox[sample_index].roll  = *roll;
+            sample_index++;
+        }
+        counter = 0;
+    }
+
 }
 

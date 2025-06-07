@@ -19,6 +19,7 @@
 #include <stdio.h>
 extern TIM_HandleTypeDef htim3;
 extern int effort_set, K_effort;
+extern int effortRate;
 // PID Constants
 extern int32_t Kp_roll, Ki_roll, Kd_roll;
 extern int32_t Kp_pitch, Ki_pitch, Kd_pitch;
@@ -33,41 +34,18 @@ extern int32_t roll_effort, pitch_effort, yaw_effort;       // output of control
 // PID Scaling
 #define PID_SCALE 100000
 
+int motA_offset = 960;
+int motB_offset = 1230;
+int motC_offset = 960;
+int motD_offset = 980;
+
 int A, B, C, D = 0;
-extern int armCompare = 0;
+int armCompare = 0;
+int  max_integral = 100000;
 
 void armESC()
 {
-/*
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
-
-    // Step 1: Send 960 (approx. 1000us) to arm
-    uint16_t armCompare = 960;
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
-
-    while(roll_set < 150000){// Wait 3 seconds for ESCs to arm while blinking LED
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
-        HAL_Delay(125);
-    }
-
-
-    // Step 2: Now ready for throttle control
-    while(roll_set > -150000){
-     armCompare = 2000;
-     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
-     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, armCompare);
-     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, armCompare);
-     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, armCompare);
-            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
-            HAL_Delay(125);
-        }
- */
+ effort_set = 1000;
 	while(roll_set < 150000){
 	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -75,7 +53,7 @@ void armESC()
 	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
 	    // Step 1: Send 960 (approx. 1000us) to arm
-	    armCompare = effort_set*1.5 +960;
+	    armCompare = effort_set*4 - 2000;
 	    if (armCompare < 960) armCompare = 960;
 	    if (armCompare > 2000) armCompare = 2000;
 	    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, armCompare);
@@ -86,6 +64,8 @@ void armESC()
 	    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Change GPIOA and PIN as needed
 	    HAL_Delay(125);
     }
+   effort_set = 0;
+   armCompare = 0;
 }
 
 
@@ -97,13 +77,10 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
 	roll_integral += roll_error;
 	roll_derivative = roll_error - last_roll_error;
 
-
 	///TESTING ONLY
 	roll_effort = -(Kp_roll * roll_error + Ki_roll * roll_integral + Kd_roll * roll_derivative) / PID_SCALE;
-	/////END TESTING
-
-
 	roll_effort = 0;
+	/////END TESTING
 	last_roll_error = roll_error;
 
 	// Pitch
@@ -112,7 +89,13 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
 	pitch_set = 0;
 	/////END TESTING
 	int pitch_error = -pitch_set + pitch_true;
-	pitch_integral += pitch_error;
+
+	pitch_integral += pitch_error/1000;
+	if (pitch_integral > max_integral) {
+	    pitch_integral = max_integral;
+	} else if (pitch_integral < -max_integral) {
+	    pitch_integral = -max_integral;
+	}
 	pitch_derivative = pitch_error - last_pitch_error;
 	pitch_effort = -(Kp_pitch * pitch_error + Ki_pitch * pitch_integral + Kd_pitch * pitch_derivative) / PID_SCALE;
 	last_pitch_error = pitch_error;
@@ -127,7 +110,10 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
 
 
 	// Start with base throttle
-	A = B = C = D = effort_set * K_effort + 960;
+	A = effort_set * K_effort/PID_SCALE + motA_offset;
+	B = effort_set * K_effort/PID_SCALE + motB_offset;
+	C = effort_set * K_effort/PID_SCALE + motC_offset;
+	D = effort_set * K_effort/PID_SCALE + motD_offset;
 
 	// Pitch: affects A, B, C
 	if (pitch_effort > 0) {
@@ -135,7 +121,7 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
 	    D += pitch_effort;
 	}
 	else if (pitch_effort < 0) {
-	    B -= pitch_effort;  // pitch_effort is negative
+	    B -= pitch_effort;
 	    C -= pitch_effort;
 	}
 
@@ -172,7 +158,8 @@ void update_Motors(){ //Compare 960 = 1ms (0%)    Compare 2000 = 2ms (100%)
     if (D < 960) D = 960;
     if (D > 1500) D = 1500;
 
-    //printf("%d,%d,%d,%d \r\n", A, B, C, D);
+
+     //printf("%d,%d,%d,%d \r\n", pitch_true, 0, 0, 0);
 
 
 

@@ -18,8 +18,10 @@
 
 // Prototype for motor object "method"
 void InitializeBT(void);
-void processInput(char *charBuf, int32_t *roll, int32_t *pitch, int32_t *yaw, int32_t *effort);
-//void read(void);
-//void write(void);
+void processInput(char *charBuf, int32_t *roll, int32_t *pitch, int32_t *yaw, int32_t *effort, int *dumpFlag);
+void dumpBlackbox();
+
+
+
 
 #endif /* INC_HC05_H_ */
