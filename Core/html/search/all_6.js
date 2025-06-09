@@ -1,7 +1,7 @@
 var searchData=
 [
-  ['main_0',['main',['../main_8c.html#a840291bc02cba5474a4cb46a9b9566fe',1,'main.c']]],
-  ['main_2ec_1',['main.c',['../main_8c.html',1,'']]],
-  ['main_2eh_2',['main.h',['../main_8h.html',1,'']]],
-  ['memmanage_5fhandler_3',['MemManage_Handler',['../stm32f4xx__it_8h.html#a3150f74512510287a942624aa9b44cc5',1,'MemManage_Handler(void):&#160;stm32f4xx_it.c'],['../stm32f4xx__it_8c.html#a3150f74512510287a942624aa9b44cc5',1,'MemManage_Handler(void):&#160;stm32f4xx_it.c']]]
+  ['false_0',['false',['../_b_n_o055_8h.html#a65e9886d74aaee76545e83dd09011727',1,'false:&#160;BNO055.h'],['../_e_s_c_8h.html#a65e9886d74aaee76545e83dd09011727',1,'false:&#160;ESC.h']]],
+  ['features_1',['Key Features',['../index.html#features_sec',1,'']]],
+  ['flight_20control_20system_2',['Quadcopter Flight Control System',['../index.html',1,'']]],
+  ['flight_20instructions_3',['Flight Instructions',['../index.html#flight_instr',1,'']]]
 ];

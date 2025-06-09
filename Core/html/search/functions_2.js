@@ -1,5 +1,6 @@
 var searchData=
 [
-  ['debugmon_5fhandler_0',['DebugMon_Handler',['../stm32f4xx__it_8h.html#adbdfb05858cc36fc520974df37ec3cb0',1,'DebugMon_Handler(void):&#160;stm32f4xx_it.c'],['../stm32f4xx__it_8c.html#adbdfb05858cc36fc520974df37ec3cb0',1,'DebugMon_Handler(void):&#160;stm32f4xx_it.c']]],
-  ['dma1_5fstream5_5firqhandler_1',['DMA1_Stream5_IRQHandler',['../stm32f4xx__it_8h.html#ac201b60d58b0eba2ce0b55710eb3c4d0',1,'DMA1_Stream5_IRQHandler(void):&#160;stm32f4xx_it.c'],['../stm32f4xx__it_8c.html#ac201b60d58b0eba2ce0b55710eb3c4d0',1,'DMA1_Stream5_IRQHandler(void):&#160;stm32f4xx_it.c']]]
+  ['bno_5finit_0',['BNO_Init',['../_b_n_o055_8h.html#a348c74c0f81f24bf3c32c2474bdda081',1,'BNO_Init(void):&#160;BNO055.c'],['../_b_n_o055_8c.html#acfcacd8ad3833c1dfba254dec3063044',1,'BNO_Init():&#160;BNO055.c']]],
+  ['bno_5fread_1',['BNO_Read',['../_b_n_o055_8h.html#aa4793269f7c346ae889fcb8a24130133',1,'BNO_Read(int32_t *roll, int32_t *pitch, int32_t *yaw):&#160;BNO055.c'],['../_b_n_o055_8c.html#aa4793269f7c346ae889fcb8a24130133',1,'BNO_Read(int32_t *roll, int32_t *pitch, int32_t *yaw):&#160;BNO055.c']]],
+  ['busfault_5fhandler_2',['BusFault_Handler',['../stm32f4xx__it_8h.html#a850cefb17a977292ae5eb4cafa9976c3',1,'BusFault_Handler(void):&#160;stm32f4xx_it.c'],['../stm32f4xx__it_8c.html#a850cefb17a977292ae5eb4cafa9976c3',1,'BusFault_Handler(void):&#160;stm32f4xx_it.c']]]
 ];

@@ -11,5 +11,6 @@ var stm32f4xx__it_8c =
     [ "SysTick_Handler", "stm32f4xx__it_8c.html#ab5e09814056d617c521549e542639b7e", null ],
     [ "UsageFault_Handler", "stm32f4xx__it_8c.html#a1d98923de2ed6b7309b66f9ba2971647", null ],
     [ "USART1_IRQHandler", "stm32f4xx__it_8c.html#a7139cd4baabbbcbab0c1fe6d7d4ae1cc", null ],
-    [ "USART2_IRQHandler", "stm32f4xx__it_8c.html#a0ca6fd0e6f77921dd1123539857ba0a8", null ]
+    [ "USART2_IRQHandler", "stm32f4xx__it_8c.html#a0ca6fd0e6f77921dd1123539857ba0a8", null ],
+    [ "huart2", "stm32f4xx__it_8c.html#aa9479c261d65eecedd3d9582f7f0f89c", null ]
 ];

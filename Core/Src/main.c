@@ -1,8 +1,72 @@
+/**
+ * @mainpage Quadcopter Flight Control System
+ *
+ * @section intro_sec Introduction
+ *
+ * This is the documentation for a quadcopter design by Aaron Lubisnky and Dane Carroll. This project was taken on and
+ * guided by Cal Poly's ME507 course (Graduate Mechanical Control Systems) and instructed by lecturer, Charlie Refvem.
+ *
+ * The drone has a custom designed and 3D printed frame.
+ * It has been designed to operate using a custom PCB including an onboard STM2F411CEU6 MCU and BNO055 IMU. Though,
+ * currently uses a Blackpill development board and Bosch BN055 development board due to in house PCB manufacturing failures.
+ * The arming sequence is tailored towards ReadyTosky ESCs and the bluetooth module (HC05) is intended to interact with
+ * a PC running a custom python script for drone control and plotting blackboc data.
+ *
+ * @section features_sec Key Features
+ *
+ * - PID control for roll, pitch, and yaw
+ * - BNO055 IMU integration
+ * - ESC motor control with safety limits
+ * - Flight data logging (blackbox)
+ *
+ * @section hardware_sec Hardware Requirements
+ *
+ * - STM32F4 Development Board
+ * - BNO055 IMU Module
+ * - HC05 Bluetooth Module
+ * - 4x Electronic Speed Controllers (ESCs)
+ * - 4x 3 Phase Brushless Motors
+ * - 4-channel Power Distribution Board
+ * - 3s/4s Battery
+ * - Status LEDs
+ *
+ * @section usage_sec Getting Started
+ *
+ * 1. Start program and observe LEDs.
+ * 2. Solid Red LED indicates that the BNO055 is calibrating. Maneuver in figure-8 pattern until blinking stops LED is calibrated
+ * 3. Use controller to begin arming sequence by pulling left joystick fully to the left. The Red LED should blink at 2Hz.
+ * 4. Connect ESCs to battery. The program will already be applying 100% duty cycle. Wait for audio prompts.
+ * 5. Listen for a sequence on 4 rapid ESC beeps followed by a single beep. Hold LT on xbox controller for 5 seconds.
+ * 6. Once LT is released, wait for another audio prompt. Pull LT fully to the right to begin ooperational mode.
+ * 2. Follow flying instructions until flight concludes. Optionally, press ENTER on python terminal to retrieve blackbox data
+ * 3. Unplug battery from power distribution board
+ *
+ * @section modules_sec Modules
+ *
+ * - @ref ESC.c "ESC Driver" - Motor control and PID implementation
+ * - @ref BNO055.c "BNO055 Driver" - IMU sensor interface
+ * - @ref HC05.c "Bluetooth Driver" = Bluetooth receive and transmit, data parsing
+ * * @section flight_instr Flight Instructions
+ *  For use only with gaming controller in operational mode
+ * - Left Trigger: decrement thrust
+ * - Right Trigger: increment thrust
+ * - Left Joystick (horizontal): Roll
+ * - Left Joystick (vertical): Pitch
+ * - Right Joystick (horizontal): decrement/increment Yaw
+ *
+ * @author Aaron Lubinsky & Dane Carroll
+ * @version 1.0
+ * @date 2025
+ */
+
+
+
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body for ME507 - MECHA15 - S25
+  * @file main.c
+  * @brief Main program for quadcopter control. derived as FSM mastermind, implemented in pupre C.
   ******************************************************************************
   * @attention
   *
@@ -62,29 +126,31 @@ DMA_HandleTypeDef hdma_usart2_rx;
 /* USER CODE BEGIN PV */
 UART_HandleTypeDef *BT_UART_ptr = &huart2;
 UART_HandleTypeDef *STLink_UART_ptr = &huart1;
-int state = 0;
 volatile int imu_request = 0;
 
 //State
+int state = 0;
 int32_t roll_set, pitch_set, yaw_set, effort_set;                // from user control
 int32_t roll_true, pitch_true, yaw_true;             // from IMU
 int32_t roll_effort, pitch_effort, yaw_effort;
+int stopFlag = false; //triggered when effortSet is 0
 
 // PID vars
 int32_t roll_integral, pitch_integral, yaw_integral;
 int32_t roll_derivative, pitch_derivative, yaw_derivative;
+int32_t roll_error, pitch_error, yaw_error;        // error for sample n-1
 int32_t last_roll_error, last_pitch_error, last_yaw_error;        // error for sample n-1
 int32_t last_last_roll_error, last_last_pitch_error, last_last_yaw_error; // error for sample n-2
 
 // Gains
 int32_t K_effort = 50000;
 // Roll Axis
-int32_t Kp_roll  = 100;
+int32_t Kp_roll = 0;
 int32_t Ki_roll = 0;
 int32_t Kd_roll = 0;
 // Pitch Axis
-int32_t Kp_pitch  = 100;
-int32_t Ki_pitch = 0;
+int32_t Kp_pitch = 200;
+int32_t Ki_pitch = 100;
 int32_t Kd_pitch = 0;
 
 // Yaw Axis
@@ -162,20 +228,18 @@ int main(void)
   MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
 
-  //HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  { //potential to use HAL tim int flag if control loop needs to run at percise intervals to avoid spike in derivative/integral calculation
+  {
 	 if (state == 0){
-
 		 BNO_Init();
 		 state = 1;
 	 }else if (state == 1){
 		 HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1);
-		 if (roll_set<-150000){
+		 if (roll_set<-10000){
 			 armESC();
 			 state = 2;
 			 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
@@ -196,10 +260,10 @@ int main(void)
 		 	 dumpBlackbox();
 		 	 dumpFlag = 0;
 		 	HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1);
-		 	 if (roll_set<-150000){
-		 				 armESC();
-		 				 state = 2;
-		 				 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
+		 	armESC();
+		 	state = 2;
+		 	effort_set = 0;
+		 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
 
 
  }
@@ -218,7 +282,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
-}
+
 
 /**
   * @brief System Clock Configuration

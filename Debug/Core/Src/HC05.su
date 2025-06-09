@@ -1,3 +1,2 @@
-../Core/Src/HC05.c:30:6:InitializeBT	4	static
-../Core/Src/HC05.c:34:6:processInput	56	static
-../Core/Src/HC05.c:81:6:dumpBlackbox	88	static
+../Core/Src/HC05.c:101:6:processInput	56	static
+../Core/Src/HC05.c:191:6:dumpBlackbox	104	static

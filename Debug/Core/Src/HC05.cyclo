@@ -1,3 +1,2 @@
-../Core/Src/HC05.c:30:6:InitializeBT	1
-../Core/Src/HC05.c:34:6:processInput	11
-../Core/Src/HC05.c:81:6:dumpBlackbox	2
+../Core/Src/HC05.c:101:6:processInput	13
+../Core/Src/HC05.c:191:6:dumpBlackbox	2
