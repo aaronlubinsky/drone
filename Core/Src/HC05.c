@@ -152,6 +152,7 @@ void processInput(char *charBuf, int32_t *roll, int32_t *pitch, int32_t *yaw, in
     *effort = *effort + (RT - LT) * effortRate / 1000;
 
     // Constrain effort to safe limits
+    stopFlag = false;
     if (*effort < 0) {
         *effort = 0;
         stopFlag = true;
@@ -195,7 +196,6 @@ void dumpBlackbox(void)
     //snprintf(paramMsg, sizeof(paramMsg), "Kp_pitch: %ld, Ki_pitch: %ld, Kd_pitch: %ld, Kp_roll: %ld, Ki_roll: %ld, Kd_roll: %ld \r\n",Kp_pitch, Ki_pitch, Kd_pitch, Kp_roll, Ki_roll, Kd_roll);
     //HAL_UART_Transmit(&huart2, (uint8_t*)paramMsg, strlen(paramMsg), HAL_MAX_DELAY);
 
-    HAL_Delay(200); // Give receiver time to prepare for data stream
 
     char msg[64]; ///< Message buffer for each data line
 
@@ -209,3 +209,21 @@ void dumpBlackbox(void)
         HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
     }
 }
+
+
+void sendATCommand(const char* cmd) {
+HAL_UART_Transmit(&huart2, (uint8_t*)cmd, strlen(cmd), HAL_MAX_DELAY);
+HAL_Delay(500); // Small delay to give HC-05 time to process
+}
+
+
+void configure_HC05() {
+// Optional: Reset to defaults
+// sendATCommand("AT+ORGL\r\n");
+
+sendATCommand("AT+NAME=MECHA16 ROBOT BT\r\n"); // Module Name
+//sendATCommand("AT+PSWD=0614\r\n");
+sendATCommand("AT+UART=115200,0,0\r\n"); // Set Baud Rate
+sendATCommand("AT+RESET\r\n"); // Apply Changes
+}
+/* USER CODE END 0 */

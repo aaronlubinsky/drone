@@ -1,67 +1,3 @@
-/**
- * @mainpage Quadcopter Flight Control System
- *
- * @section intro_sec Introduction
- *
- * This is the documentation for a quadcopter design by Aaron Lubisnky and Dane Carroll. This project was taken on and
- * guided by Cal Poly's ME507 course (Graduate Mechanical Control Systems) and instructed by lecturer, Charlie Refvem.
- *
- * The drone has a custom designed and 3D printed frame.
- * It has been designed to operate using a custom PCB including an onboard STM2F411CEU6 MCU and BNO055 IMU. Though,
- * currently uses a Blackpill development board and Bosch BN055 development board due to in house PCB manufacturing failures.
- * The arming sequence is tailored towards ReadyTosky ESCs and the bluetooth module (HC05) is intended to interact with
- * a PC running a custom python script for drone control and plotting blackboc data.
- *
- * @section features_sec Key Features
- *
- * - PID control for roll, pitch, and yaw
- * - BNO055 IMU integration
- * - ESC motor control with safety limits
- * - Flight data logging (blackbox)
- *
- * @section hardware_sec Hardware Requirements
- *
- * - STM32F4 Development Board
- * - BNO055 IMU Module
- * - HC05 Bluetooth Module
- * - 4x Electronic Speed Controllers (ESCs)
- * - 4x 3 Phase Brushless Motors
- * - 4-channel Power Distribution Board
- * - 3s/4s Battery
- * - Status LEDs
- *
- * @section usage_sec Getting Started
- *
- * 1. Start program and observe LEDs.
- * 2. Solid Red LED indicates that the BNO055 is calibrating. Maneuver in figure-8 pattern until blinking stops LED is calibrated
- * 3. Use controller to begin arming sequence by pulling left joystick fully to the left. The Red LED should blink at 2Hz.
- * 4. Connect ESCs to battery. The program will already be applying 100% duty cycle. Wait for audio prompts.
- * 5. Listen for a sequence on 4 rapid ESC beeps followed by a single beep. Hold LT on xbox controller for 5 seconds.
- * 6. Once LT is released, wait for another audio prompt. Pull LT fully to the right to begin ooperational mode.
- * 2. Follow flying instructions until flight concludes. Optionally, press ENTER on python terminal to retrieve blackbox data
- * 3. Unplug battery from power distribution board
- *
- * @section modules_sec Modules
- *
- * - @ref ESC.c "ESC Driver" - Motor control and PID implementation
- * - @ref BNO055.c "BNO055 Driver" - IMU sensor interface
- * - @ref HC05.c "Bluetooth Driver" = Bluetooth receive and transmit, data parsing
- * * @section flight_instr Flight Instructions
- *  For use only with gaming controller in operational mode
- * - Left Trigger: decrement thrust
- * - Right Trigger: increment thrust
- * - Left Joystick (horizontal): Roll
- * - Left Joystick (vertical): Pitch
- * - Right Joystick (horizontal): decrement/increment Yaw
- *
- * @author Aaron Lubinsky & Dane Carroll
- * @version 1.0
- * @date 2025
- */
-
-
-
-
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -105,6 +41,7 @@
 #define true 1
 #define false 0
 #define BT_MSG_LEN 37
+//#define BT_MSG_LEN 2
 
 /* USER CODE END PD */
 
@@ -145,12 +82,12 @@ int32_t last_last_roll_error, last_last_pitch_error, last_last_yaw_error; // err
 // Gains
 int32_t K_effort = 50000;
 // Roll Axis
-int32_t Kp_roll = 0;
-int32_t Ki_roll = 0;
+int32_t Kp_roll = 200;
+int32_t Ki_roll = 15;
 int32_t Kd_roll = 0;
 // Pitch Axis
 int32_t Kp_pitch = 200;
-int32_t Ki_pitch = 100;
+int32_t Ki_pitch = 15;
 int32_t Kd_pitch = 0;
 
 // Yaw Axis
@@ -204,8 +141,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-
-	HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -226,6 +162,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_I2C3_Init();
+
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -235,32 +172,33 @@ int main(void)
   while (1)
   {
 	 if (state == 0){
+		 //configure_HC05();
 		 BNO_Init();
 		 state = 1;
+
 	 }else if (state == 1){
-		 HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1);
-		 if (roll_set<-10000){
+		 HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1); //allow for DMA Callback
+
+		 		 stopFlag = true;
+		 if (roll_set < -10000){
 			 armESC();
 			 state = 2;
-			 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
 		 }
-		 effort_set, roll_set, pitch_set = 0;
-		 pitch_integral = 0;
+		 effort_set = 0;
 
-	 }else if(state == 2){
-	//		 imu_request = true;
-	//	  if (imu_request) {
-    //		  imu_request = false;
-		      BNO_Read(&roll_true, &pitch_true, &yaw_true);
-			  update_Motors(roll_effort, pitch_effort, yaw_effort, effort_set);
-			  if (dumpFlag == 1){
-				  state = 3; }
+	 }else if(state == 2){ //State 2 is operation (flying) mode where the drone reads the BNO, updates motor PWM to the latest bluetooth DMA
+		  BNO_Read(&roll_true, &pitch_true, &yaw_true);
+		  update_Motors();
+		  if (dumpFlag == 1){
+		  			effort_set = 0;
+		  			state = 3;
+		  		 }
 
-	 }else if(state == 3){
-		 	 dumpBlackbox();
-		 	 dumpFlag = 0;
+
+	 }else if(state == 3){//This state is triggered by user input. It sends blackBox data then returns to state 2
+		 	dumpBlackbox();
+		 	dumpFlag = 0;
 		 	HAL_UART_Receive_DMA(&huart2, BT_RxBuf, BT_MSG_LEN-1);
-		 	armESC();
 		 	state = 2;
 		 	effort_set = 0;
 		 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);   // Set PA0 High (go signal)
@@ -274,7 +212,7 @@ int main(void)
 	  }//while loop close
 
 
-  }//main loop close
+  //main loop close
 
 
     /* USER CODE END WHILE */
@@ -282,7 +220,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
-
+}
 
 /**
   * @brief System Clock Configuration
@@ -509,7 +447,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;

@@ -1,2 +1,4 @@
 ../Core/Src/HC05.c:101:6:processInput	56	static
-../Core/Src/HC05.c:191:6:dumpBlackbox	104	static
+../Core/Src/HC05.c:192:6:dumpBlackbox	104	static
+../Core/Src/HC05.c:214:6:sendATCommand	16	static
+../Core/Src/HC05.c:220:6:configure_HC05	8	static

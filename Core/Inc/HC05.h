@@ -33,5 +33,6 @@ void processInput(char *charBuf, int32_t *roll, int32_t *pitch, int32_t *yaw, in
  * This function is used for offline analysis or debugging.
  */
 void dumpBlackbox(void);
+void configure_HC05();
 
 #endif /* INC_HC05_H_ */

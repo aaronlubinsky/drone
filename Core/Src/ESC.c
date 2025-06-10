@@ -191,12 +191,10 @@ void update_Motors()
     roll_derivative = roll_error - last_roll_error;
     // TESTING ONLY - Roll effort disabled
     roll_effort = -(Kp_roll * roll_error + Ki_roll * roll_integral + Kd_roll * roll_derivative) / PID_SCALE;
-    roll_effort = 0; // Disabled for testing
     last_roll_error = roll_error;
 
     /* ===== ROLL PID CALCULATION ===== */
     pitch_error = -pitch_set + pitch_true;
-
     pitch_integral += pitch_error/1000; //Wind up protection for integral
     if (pitch_integral > max_integral) {
         pitch_integral = max_integral;
@@ -235,12 +233,12 @@ void update_Motors()
 
     // Apply roll control (affects left/right motor pairs)
     if (roll_effort > 0) {
-        D += roll_effort; // Left motors get more power
-        C += roll_effort;
+        A += roll_effort; // Left motors get more power
+        B += roll_effort;
     }
     else if (roll_effort < 0) {
-        B -= roll_effort; // Right motors get more power
-        A -= roll_effort;
+        C -= roll_effort; // Right motors get more power
+        D -= roll_effort;
     }
 
     // Apply yaw control (affects diagonal motor pairs)
@@ -255,17 +253,17 @@ void update_Motors()
 
     /* ===== SAFETY LIMITS ===== */
     // Clamp all motors between 960 (0%) and 1500 (≈50% for safety)
-    if (A < 960 | (stopFlag == true)) A = 960;
-    if (A > 1500) A = 1500;
+    if ((A < 960) | (stopFlag == true)) A = 960;
+    if (A > 1600) A = 1700;
 
-    if (B < 960 | (stopFlag == true)) B = 960;
-    if (B > 1500) B = 1500;
+    if ((B < 960) | (stopFlag == true)) B = 960;
+    if (B > 1700) B = 1700;
 
-    if (C < 960 | (stopFlag == true)) C = 960;
-    if (C > 1500) C = 1500;
+    if ((C < 960) | (stopFlag == true)) C = 960;
+    if (C > 1700) C = 1700;
 
-    if (D < 960 | (stopFlag == true)) D = 960;
-    if (D > 1500) D = 1500;
+    if ((D < 960) | (stopFlag == true)) D = 960;
+    if (D > 1700) D = 1700;
 
     // Debug output (commented)
     //printf("%d,%d,%d,%d \r\n", pitch_true, 0, 0, 0);
